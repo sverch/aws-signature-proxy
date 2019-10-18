@@ -24,14 +24,14 @@ post](https://shaunverch.com/butter/open-source/2019/09/27/butter-days-6.html).
 First, make sure you have your AWS credentials set up, and then run:
 
 ```shell
-cargo run 8080 us-east-1
+cargo run 8080
 ```
 
 Then, in another terminal, run:
 
 ```shell
-http_proxy=localhost:8080 curl -s \
-    "http://ec2.amazonaws.com?Action=DescribeInstances&Version=2013-10-15"
+https_proxy=localhost:8080 curl --insecure --silent \
+    "https://ec2.amazonaws.com?Action=DescribeInstances&Version=2013-10-15"
 ```
 
 ## The AWS Signing Process
@@ -45,18 +45,20 @@ docs](https://docs.aws.amazon.com/general/latest/gr/sigv4-signed-request-example
 ## Caveats
 
 - Only `GET` requests are supported.
-- Region handling is weird, could auto detect from the URL by following
-  https://docs.aws.amazon.com/general/latest/gr/rande.html.  Also, there is a
-  relevant [rusoto issue](https://github.com/rusoto/rusoto/issues/1120) about
-  getting the default region from the current profile.
-- Only http is supported because the proxy can't change the headers for https
-  requests.  Changing the proxy library to a man in the middle proxy should
-  allow for https support.  See
-  [here](https://github.com/nlevitt/monie/blob/master/examples/add-via.rs) for
-  an example.
+- Region is hardcoded to `us-east-1`.  Could auto detect from the URL by
+  following https://docs.aws.amazon.com/general/latest/gr/rande.html.  Also,
+  there is a relevant [rusoto
+  issue](https://github.com/rusoto/rusoto/issues/1120) about getting the default
+  region from the current profile.
+- No attempt has been made to address the invalid certificate errors a client
+  will experience when working with this proxy.
 
 ## Thanks
 
-This project wouldn't be possible without the great work on
-https://github.com/okigan/awscurl.  The signing logic is heavily ported from
-that.
+- This project wouldn't be possible without the great work on
+  https://github.com/okigan/awscurl.  The signing logic is heavily ported from
+  that.
+- It also wouldn't be possible without
+  https://github.com/terry90/rs-simple-proxy which the first version was based
+  on or https://github.com/nlevitt/monie which was necessary for man in the
+  middle https support.
