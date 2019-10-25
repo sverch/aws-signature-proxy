@@ -2,10 +2,11 @@
 
 ## Motivation
 
-The AWS API requires a non-standard signing process invented by Amazon, which
-makes it incompatible with many standard tools, as you can see from the need for
-projects like [awscurl](https://github.com/okigan/awscurl), also known as "curl
-but it works with AWS".
+The AWS API requires a [non-standard signing process invented by
+Amazon](https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html),
+which makes it incompatible with many standard tools, as you can see from the
+need for projects like [awscurl](https://github.com/okigan/awscurl), also known
+as "curl but it works with AWS".
 
 This project aims to fix that by hiding the non-standard signing process behind
 a proxy, so that standard clients like curl (example below) and
@@ -32,6 +33,14 @@ Then, in another terminal, run:
 http_proxy=localhost:8080 curl -s \
     "http://ec2.amazonaws.com?Action=DescribeInstances&Version=2013-10-15"
 ```
+
+## The AWS Signing Process
+
+If you want to understand the signing process, there are many AWS docs on this.
+For the purposes of this project, the logic here was taken from
+[awscurl](https://github.com/okigan/awscurl), which in turn was likely heavily
+copied from [these python examples in the AWS
+docs](https://docs.aws.amazon.com/general/latest/gr/sigv4-signed-request-examples.html).
 
 ## Caveats
 

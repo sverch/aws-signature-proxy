@@ -69,6 +69,12 @@ impl AwsUTCDateStrings {
 
 /// Returns a HashMap with the proper signature headers for the given request
 ///
+/// If you want to understand the signing process, there are many AWS docs on this.  For the
+/// purposes of this project, the logic here was taken from
+/// [awscurl](https://github.com/okigan/awscurl), which in turn was likely heavily copied from
+/// [these python examples in the AWS
+/// docs](https://docs.aws.amazon.com/general/latest/gr/sigv4-signed-request-examples.html).
+///
 /// # Arguments
 ///
 /// * `aws_utc_datestrings` - Some current time strings that AWS expects in the signing process
@@ -292,6 +298,11 @@ fn task_4_build_auth_headers_for_the_request(
     // The request can include any headers, but MUST include "host", "x-amz-date", and (for this
     // scenario) "Authorization". "host" and "x-amz-date" must be included in the canonical_headers
     // and signed_headers, as noted earlier. Order here is not significant.
+    //
+    // As described in the README, much of this logic was copied from another project, which was in
+    // turn likely copied from AWS docs examples, so these headers originated from there.  You can
+    // also read https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html for
+    // some ideas of what headers need to be set.
     let mut headers = ::std::collections::HashMap::new();
     headers.insert(
         String::from("Authorization"),
