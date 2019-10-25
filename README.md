@@ -45,11 +45,6 @@ docs](https://docs.aws.amazon.com/general/latest/gr/sigv4-signed-request-example
 ## Caveats
 
 - Only `GET` requests are supported.
-- Region is hardcoded to `us-east-1`.  Could auto detect from the URL by
-  following https://docs.aws.amazon.com/general/latest/gr/rande.html.  Also,
-  there is a relevant [rusoto
-  issue](https://github.com/rusoto/rusoto/issues/1120) about getting the default
-  region from the current profile.
 - No attempt has been made to address the invalid certificate errors a client
   will experience when working with this proxy.
 
