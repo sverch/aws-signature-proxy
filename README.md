@@ -1,6 +1,22 @@
 # AWS Sigature Proxy
 
-A proxy whose entire job is to sign requests destined for the AWS API.
+## Motivation
+
+The AWS API requires a non-standard signing process invented by Amazon, which
+makes it incompatible with many standard tools, as you can see from the need for
+projects like [awscurl](https://github.com/okigan/awscurl), also known as "curl
+but it works with AWS".
+
+This project aims to fix that by hiding the non-standard signing process behind
+a proxy, so that standard clients like curl (example below) and
+[OpenAPI](https://github.com/APIs-guru/openapi-directory/tree/master/APIs/amazonaws.com)
+can interact with the AWS API by sending all requests through it.
+
+That will hopefully allow us to take advantage of powerful open source tools
+that would otherwise be difficult to use with this API. If you are bored and
+want to know why the proxy seemed like a good idea over other alternatives, feel
+free to read [this
+post](https://shaunverch.com/butter/open-source/2019/09/27/butter-days-6.html).
 
 ## Usage
 
