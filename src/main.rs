@@ -52,7 +52,7 @@ impl Middleware for AwsSignatureHeaders {
         _context: &ServiceContext,
         _state: &State,
     ) -> Result<MiddlewareResult, MiddlewareError> {
-        let (amzdate, datestamp) = aws_signature_builder::get_utc_aws_signature_datestrings();
+        let aws_utc_datestrings = aws_signature_builder::AwsUTCDateStrings::new();
         let mut headers = ::std::collections::HashMap::new();
         for (key, value) in req.headers().iter() {
             headers.insert(String::from(key.as_str()), String::from(value.to_str().unwrap()));
@@ -66,16 +66,15 @@ impl Middleware for AwsSignatureHeaders {
         let provider = DefaultCredentialsProvider::new().unwrap();
         let credentials = provider.credentials().wait().unwrap();
         let new_headers = aws_signature_builder::generate_aws_signature_headers(
+            aws_utc_datestrings,
             req.uri().query().unwrap().to_string(),
             headers,
             port,
             req.uri().host().unwrap().to_string(),
-            amzdate,
             req.method().to_string(),
             Vec::new(),
             None,
             false,
-            datestamp,
             host_parts[0].to_string(),
             self.region.clone(),
             credentials.aws_access_key_id().to_string(),

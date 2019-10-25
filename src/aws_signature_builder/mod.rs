@@ -23,24 +23,34 @@ fn normalize_query_string(query: String) -> String {
     return String::from(querystring::stringify(query_pairs).trim_end_matches("&"));
 }
 
-pub fn get_utc_aws_signature_datestrings() -> (String, String) {
-    let now = chrono::Utc::now();
-    let amzdate = now.format("%Y%m%dT%H%M%SZ").to_string();
-    let datestamp = now.format("%Y%m%d").to_string();
-    return (amzdate, datestamp)
+/// These are the datestrings that are expected in the AWS request.  We generate this all at once
+/// because I think the times are supposed to match.  At least that's how the code in
+/// https://docs.aws.amazon.com/general/latest/gr/sigv4-signed-request-examples.html does it.
+#[derive(Debug, Clone)]
+pub struct AwsUTCDateStrings {
+    pub amzdate: String,
+    pub datestamp: String,
+}
+
+impl AwsUTCDateStrings {
+    pub fn new() -> Self {
+        let now = chrono::Utc::now();
+        let amzdate = now.format("%Y%m%dT%H%M%SZ").to_string();
+        let datestamp = now.format("%Y%m%d").to_string();
+        AwsUTCDateStrings{ amzdate: amzdate, datestamp: datestamp }
+    }
 }
 
 pub fn generate_aws_signature_headers(
+    aws_utc_datestrings: AwsUTCDateStrings,
     query: String,
     headers: HashMap<String, String>,
     port: Option<u16>,
     host: String,
-    amzdate: String,
     method: String,
     data: Vec<u8>,
     security_token: Option<String>,
     data_binary: bool,
-    datestamp: String,
     service: String,
     region: String,
     access_key: String,
@@ -49,16 +59,20 @@ pub fn generate_aws_signature_headers(
     let (canonical_request,
          payload_hash,
          signed_headers) = task_1_create_a_canonical_request(
-         query, headers, port, host, amzdate.clone(), method, data, security_token.clone(),
-         data_binary, canonical_uri);
+        aws_utc_datestrings.clone(),
+        query, headers, port, host, method, data, security_token.clone(),
+        data_binary, canonical_uri);
     let (string_to_sign,
          algorithm,
          credential_scope) = task_2_create_the_string_to_sign(
-         amzdate.clone(), datestamp.clone(), canonical_request, service.clone(), region.clone());
+        aws_utc_datestrings.clone(),
+        canonical_request, service.clone(), region.clone());
     let signature = task_3_calculate_the_signature(
-        datestamp, string_to_sign, service, region, secret_key);
+        aws_utc_datestrings.clone(),
+        string_to_sign, service, region, secret_key);
     let new_headers = task_4_build_auth_headers_for_the_request(
-        amzdate, payload_hash, algorithm, credential_scope, signed_headers, signature, access_key,
+        aws_utc_datestrings.clone(),
+        payload_hash, algorithm, credential_scope, signed_headers, signature, access_key,
         security_token);
     return new_headers;
 }
@@ -71,11 +85,11 @@ pub fn generate_aws_signature_headers(
 /// Step 2: Create canonical URI--the part of the URI from domain to query string (use '/' if no
 /// path)
 fn task_1_create_a_canonical_request(
+    aws_utc_datestrings: AwsUTCDateStrings,
     query: String,
     headers: HashMap<String, String>,
     port: Option<u16>,
     host: String,
-    amzdate: String,
     method: String,
     data: Vec<u8>,
     security_token: Option<String>,
@@ -102,7 +116,8 @@ fn task_1_create_a_canonical_request(
 
     // Step 4: Create the canonical headers and signed headers. Header names and value must be
     // trimmed and lowercase, and sorted in ASCII order.  Note that there is a trailing \n.
-    let mut canonical_headers = format!("host:{}\nx-amz-date:{}\n", fullhost, amzdate);
+    let mut canonical_headers = format!("host:{}\nx-amz-date:{}\n", fullhost,
+        aws_utc_datestrings.amzdate);
     match &security_token {
         Some(t) => canonical_headers.push_str(&format!("x-amz-security-token:{}\n", t)),
         None => (),
@@ -144,25 +159,25 @@ fn task_1_create_a_canonical_request(
 /// ************* TASK 2: CREATE THE STRING TO SIGN*************
 /// Match the algorithm to the hashing algorithm you use, either SHA-1 or SHA-256 (recommended)
 fn task_2_create_the_string_to_sign(
-    amzdate: String,
-    datestamp: String,
+    aws_utc_datestrings: AwsUTCDateStrings,
     canonical_request: String,
     service: String,
     region: String) -> (String, String, String) {
     let algorithm = String::from("AWS4-HMAC-SHA256");
-    let credential_scope = format!("{}/{}/{}/aws4_request", datestamp, region, service);
+    let credential_scope = format!("{}/{}/{}/aws4_request", aws_utc_datestrings.datestamp, region,
+        service);
     let mut hasher = Sha256::new();
     hasher.input_str(&canonical_request);
     let canonical_request_hash = hasher.result_str();
-    let string_to_sign = format!("{}\n{}\n{}\n{}", algorithm, amzdate, credential_scope,
-        canonical_request_hash);
+    let string_to_sign = format!("{}\n{}\n{}\n{}", algorithm, aws_utc_datestrings.amzdate,
+        credential_scope, canonical_request_hash);
 
     return (string_to_sign, algorithm, credential_scope)
 }
 
 /// ************* TASK 3: CALCULATE THE SIGNATURE *************
 fn task_3_calculate_the_signature(
-    datestamp: String,
+    aws_utc_datestrings: AwsUTCDateStrings,
     string_to_sign: String,
     service: String,
     region: String,
@@ -178,7 +193,8 @@ fn task_3_calculate_the_signature(
     // See: http://docs.aws.amazon.com
     // /general/latest/gr/signature-v4-examples.html
     // #signature-v4-examples-python
-    let k_date = HMAC::mac(datestamp.as_bytes(), format!("AWS4{}", secret_key).as_bytes());
+    let k_date = HMAC::mac(aws_utc_datestrings.datestamp.as_bytes(), format!("AWS4{}",
+            secret_key).as_bytes());
     let k_region = HMAC::mac(region.as_bytes(), &k_date);
     let k_service = HMAC::mac(service.as_bytes(), &k_region);
     let k_signing = HMAC::mac(b"aws4_request", &k_service);
@@ -194,7 +210,7 @@ fn task_3_calculate_the_signature(
 /// Authorization. This function shows how to use the header.  It returns a headers dict with all
 /// the necessary signing headers.
 fn task_4_build_auth_headers_for_the_request(
-    amzdate: String,
+    aws_utc_datestrings: AwsUTCDateStrings,
     payload_hash: String,
     algorithm: String,
     credential_scope: String,
@@ -216,7 +232,7 @@ fn task_4_build_auth_headers_for_the_request(
         String::from(authorization_header));
     headers.insert(
         String::from("x-amz-date"),
-        String::from(amzdate));
+        String::from(aws_utc_datestrings.amzdate));
     match &security_token {
         Some(t) => headers.insert(
             String::from("x-amz-security-token"),
@@ -256,11 +272,14 @@ mod tests {
         let (canonical_request,
              payload_hash,
              signed_headers) = super::task_1_create_a_canonical_request(
+            super::AwsUTCDateStrings{
+                amzdate: String::from("20190921T022008Z"),
+                datestamp: String::from("20190921")
+            },
             String::from("Action=DescribeInstances&Version=2013-10-15"),
             headers,
             None,
             String::from("ec2.amazonaws.com"),
-            String::from("20190921T022008Z"),
             String::from("GET"),
             Vec::new(),
             None,
@@ -285,8 +304,10 @@ mod tests {
         let (string_to_sign,
              algorithm,
              credential_scope) = super::task_2_create_the_string_to_sign(
-            String::from("20190921T022008Z"),
-            String::from("20190921"),
+            super::AwsUTCDateStrings{
+                amzdate: String::from("20190921T022008Z"),
+                datestamp: String::from("20190921")
+            },
             String::from("GET\n\
             /\n\
             Action=DescribeInstances&Version=2013-10-15\n\
@@ -309,7 +330,10 @@ mod tests {
     #[test]
     fn test_task_3_calculate_the_signature() {
         let signature = super::task_3_calculate_the_signature(
-            String::from("20190921"),
+            super::AwsUTCDateStrings{
+                amzdate: String::from("20190921T022008Z"),
+                datestamp: String::from("20190921")
+            },
             String::from("AWS4-HMAC-SHA256\n\
                 20190921T022008Z\n\
                 20190921/us-east-1/ec2/aws4_request\n\
@@ -325,7 +349,10 @@ mod tests {
     #[test]
     fn test_task_4_build_auth_headers_for_the_request() {
         let new_headers = super::task_4_build_auth_headers_for_the_request(
-            String::from("20190921T022008Z"),
+            super::AwsUTCDateStrings{
+                amzdate: String::from("20190921T022008Z"),
+                datestamp: String::from("20190921")
+            },
             String::from("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
             String::from("AWS4-HMAC-SHA256"),
             String::from("20190921/us-east-1/ec2/aws4_request"),
@@ -358,16 +385,18 @@ mod tests {
             String::from("Accept"),
             String::from("application/xml"));
         let new_headers = super::generate_aws_signature_headers(
+            super::AwsUTCDateStrings{
+                amzdate: String::from("20190921T022008Z"),
+                datestamp: String::from("20190921")
+            },
             String::from("Action=DescribeInstances&Version=2013-10-15"),
             headers,
             None,
             String::from("ec2.amazonaws.com"),
-            String::from("20190921T022008Z"),
             String::from("GET"),
             Vec::new(),
             None,
             false,
-            String::from("20190921"),
             String::from("ec2"),
             String::from("us-east-1"),
             String::from("AKIAIJLPLDILMJV53HCQ"),
