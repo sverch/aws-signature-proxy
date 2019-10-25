@@ -74,7 +74,6 @@ impl Middleware for AwsSignatureHeaders {
             req.uri().host().unwrap().to_string(),
             req.method().to_string(),
             Vec::new(),
-            None,
             false,
             host_parts[0].to_string(),
             self.region.clone(),

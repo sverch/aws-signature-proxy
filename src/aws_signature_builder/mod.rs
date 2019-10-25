@@ -51,7 +51,6 @@ pub fn generate_aws_signature_headers(
     host: String,
     method: String,
     data: Vec<u8>,
-    security_token: Option<String>,
     data_binary: bool,
     service: String,
     region: String,
@@ -60,7 +59,8 @@ pub fn generate_aws_signature_headers(
          payload_hash,
          signed_headers) = task_1_create_a_canonical_request(
         aws_utc_datestrings.clone(),
-        query, headers, port, host, method, data, security_token.clone(),
+        query, headers, port, host, method, data,
+        credentials.token(),
         data_binary, canonical_uri);
     let (string_to_sign,
          algorithm,
@@ -74,7 +74,7 @@ pub fn generate_aws_signature_headers(
         aws_utc_datestrings.clone(),
         payload_hash, algorithm, credential_scope, signed_headers, signature,
         credentials.aws_access_key_id().to_string(),
-        security_token);
+        credentials.token());
     return new_headers;
 }
 
@@ -93,7 +93,7 @@ fn task_1_create_a_canonical_request(
     host: String,
     method: String,
     data: Vec<u8>,
-    security_token: Option<String>,
+    security_token: &Option<String>,
     data_binary: bool,
     canonical_uri: String) -> (String, String, String) {
 
@@ -218,7 +218,7 @@ fn task_4_build_auth_headers_for_the_request(
     signed_headers: String,
     signature: String,
     access_key: String,
-    security_token: Option<String>) -> HashMap<String, String> {
+    security_token: &Option<String>) -> HashMap<String, String> {
 
     // Create authorization header and add to request headers
     let authorization_header = format!("{} Credential={}/{}, SignedHeaders={}, Signature={}",
@@ -283,7 +283,7 @@ mod tests {
             String::from("ec2.amazonaws.com"),
             String::from("GET"),
             Vec::new(),
-            None,
+            &None,
             false,
             String::from("/"));
         assert_eq!(canonical_request, "GET\n\
@@ -360,7 +360,7 @@ mod tests {
             String::from("host;x-amz-date"),
             String::from("9164aea23e266890838ff6e51eea552e2ee39c63896ac61d91990f200bb16362"),
             String::from("AKIAIJLPLDILMJV53HCQ"),
-            None);
+            &None);
         assert_eq!(
             new_headers["x-amz-content-sha256"],
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
@@ -402,7 +402,6 @@ mod tests {
             String::from("ec2.amazonaws.com"),
             String::from("GET"),
             Vec::new(),
-            None,
             false,
             String::from("ec2"),
             String::from("us-east-1"),
