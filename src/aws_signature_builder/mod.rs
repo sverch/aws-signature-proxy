@@ -8,6 +8,7 @@ use hex;
 use chrono;
 
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+use rusoto_credential::AwsCredentials;
 
 use std::collections::HashMap;
 
@@ -43,6 +44,7 @@ impl AwsUTCDateStrings {
 
 pub fn generate_aws_signature_headers(
     aws_utc_datestrings: AwsUTCDateStrings,
+    credentials: AwsCredentials,
     query: String,
     headers: HashMap<String, String>,
     port: Option<u16>,
@@ -53,8 +55,6 @@ pub fn generate_aws_signature_headers(
     data_binary: bool,
     service: String,
     region: String,
-    access_key: String,
-    secret_key: String,
     canonical_uri: String) -> HashMap<String, String> {
     let (canonical_request,
          payload_hash,
@@ -69,10 +69,11 @@ pub fn generate_aws_signature_headers(
         canonical_request, service.clone(), region.clone());
     let signature = task_3_calculate_the_signature(
         aws_utc_datestrings.clone(),
-        string_to_sign, service, region, secret_key);
+        string_to_sign, service, region, credentials.aws_secret_access_key().to_string());
     let new_headers = task_4_build_auth_headers_for_the_request(
         aws_utc_datestrings.clone(),
-        payload_hash, algorithm, credential_scope, signed_headers, signature, access_key,
+        payload_hash, algorithm, credential_scope, signed_headers, signature,
+        credentials.aws_access_key_id().to_string(),
         security_token);
     return new_headers;
 }
@@ -389,6 +390,12 @@ mod tests {
                 amzdate: String::from("20190921T022008Z"),
                 datestamp: String::from("20190921")
             },
+            rusoto_credential::AwsCredentials::new(
+                String::from("AKIAIJLPLDILMJV53HCQ"),
+                String::from("dummytestsecretkey"),
+                None,
+                None
+            ),
             String::from("Action=DescribeInstances&Version=2013-10-15"),
             headers,
             None,
@@ -399,8 +406,6 @@ mod tests {
             false,
             String::from("ec2"),
             String::from("us-east-1"),
-            String::from("AKIAIJLPLDILMJV53HCQ"),
-            String::from("dummytestsecretkey"),
             String::from("/"));
         assert_eq!(
             new_headers["x-amz-content-sha256"],

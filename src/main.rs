@@ -67,6 +67,7 @@ impl Middleware for AwsSignatureHeaders {
         let credentials = provider.credentials().wait().unwrap();
         let new_headers = aws_signature_builder::generate_aws_signature_headers(
             aws_utc_datestrings,
+            credentials,
             req.uri().query().unwrap().to_string(),
             headers,
             port,
@@ -77,8 +78,6 @@ impl Middleware for AwsSignatureHeaders {
             false,
             host_parts[0].to_string(),
             self.region.clone(),
-            credentials.aws_access_key_id().to_string(),
-            credentials.aws_secret_access_key().to_string(),
             req.uri().path().to_string());
         if new_headers.contains_key(XAMZCONTENTSHA256) {
             req.headers_mut().insert(XAMZCONTENTSHA256,
