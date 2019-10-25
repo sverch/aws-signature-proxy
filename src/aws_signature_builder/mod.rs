@@ -10,6 +10,12 @@ use chrono;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use rusoto_credential::AwsCredentials;
 use hyper::{Body, Request};
+use hyper::header::HeaderValue;
+
+use hyper::header::AUTHORIZATION;
+const XAMZCONTENTSHA256: &str = "x-amz-content-sha256";
+const XAMZSECURITYTOKEN: &str = "x-amz-security-token";
+const XAMZDATE: &str = "x-amz-date";
 
 use std::collections::HashMap;
 
@@ -84,10 +90,16 @@ impl AwsUTCDateStrings {
 /// # Example
 ///
 /// ```
-/// // You can have rust code between fences inside the comments
-/// // If you pass --test to Rustdoc, it will even test it for you!
-/// use doc::Person;
-/// let person = Person::new("name");
+/// // You also need to pass in the AWS credentials and datestrings to generate the signed headers.
+/// // This example assumes `req` is a mutable request you are modifying.
+/// let aws_utc_datestrings = aws_signature_builder::AwsUTCDateStrings::new();
+/// let provider = DefaultCredentialsProvider::new().unwrap();
+/// let credentials = provider.credentials().wait().unwrap();
+/// let new_headers = aws_signature_builder::generate_aws_signature_headers(
+///     aws_utc_datestrings,
+///     credentials,
+///     req);
+/// aws_signature_builder::add_aws_signature_headers(req, new_headers);
 /// ```
 pub fn generate_aws_signature_headers(
     aws_utc_datestrings: AwsUTCDateStrings,
@@ -147,6 +159,30 @@ pub fn generate_aws_signature_headers(
         credentials.aws_access_key_id().to_string(),
         credentials.token());
     return new_headers;
+}
+
+/// Adds the necessary signature headers to the request.
+///
+/// See `generate_aws_signature_headers` for usage example.
+pub fn add_aws_signature_headers(
+    req: &mut Request<Body>,
+    headers: HashMap<String, String>) {
+    if headers.contains_key(XAMZCONTENTSHA256) {
+        req.headers_mut().insert(XAMZCONTENTSHA256,
+            HeaderValue::from_str(&headers[XAMZCONTENTSHA256]).unwrap());
+    }
+    if headers.contains_key(XAMZSECURITYTOKEN) {
+        req.headers_mut().insert(XAMZSECURITYTOKEN,
+            HeaderValue::from_str(&headers[XAMZSECURITYTOKEN]).unwrap());
+    }
+    if headers.contains_key(XAMZDATE) {
+        req.headers_mut().insert(XAMZDATE,
+            HeaderValue::from_str(&headers[XAMZDATE]).unwrap());
+    }
+    if headers.contains_key("Authorization") {
+        req.headers_mut().insert(AUTHORIZATION,
+            HeaderValue::from_str(&headers["Authorization"]).unwrap());
+    }
 }
 
 /// ************* TASK 1: CREATE A CANONICAL REQUEST *************

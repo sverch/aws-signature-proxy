@@ -14,14 +14,7 @@ struct Cli {
 use rusoto_credential::{ProvideAwsCredentials, DefaultCredentialsProvider};
 use futures::future::Future;
 
-use hyper::header::HeaderValue;
 use hyper::{Body, Request};
-
-use hyper::header::AUTHORIZATION;
-
-const XAMZCONTENTSHA256: &str = "x-amz-content-sha256";
-const XAMZSECURITYTOKEN: &str = "x-amz-security-token";
-const XAMZDATE: &str = "x-amz-date";
 
 use simple_proxy::proxy::error::MiddlewareError;
 use simple_proxy::proxy::middleware::MiddlewareResult::Next;
@@ -54,22 +47,7 @@ impl Middleware for AwsSignatureHeaders {
             aws_utc_datestrings,
             credentials,
             req);
-        if new_headers.contains_key(XAMZCONTENTSHA256) {
-            req.headers_mut().insert(XAMZCONTENTSHA256,
-                HeaderValue::from_str(&new_headers[XAMZCONTENTSHA256]).unwrap());
-        }
-        if new_headers.contains_key(XAMZSECURITYTOKEN) {
-            req.headers_mut().insert(XAMZSECURITYTOKEN,
-                HeaderValue::from_str(&new_headers[XAMZSECURITYTOKEN]).unwrap());
-        }
-        if new_headers.contains_key(XAMZDATE) {
-            req.headers_mut().insert(XAMZDATE,
-                HeaderValue::from_str(&new_headers[XAMZDATE]).unwrap());
-        }
-        if new_headers.contains_key("Authorization") {
-            req.headers_mut().insert(AUTHORIZATION,
-                HeaderValue::from_str(&new_headers["Authorization"]).unwrap());
-        }
+        aws_signature_builder::add_aws_signature_headers(req, new_headers);
         Ok(Next)
     }
 }
