@@ -2,8 +2,6 @@ extern crate simple_proxy;
 
 mod aws_signature_builder;
 
-use simple_proxy::{SimpleProxy, Environment};
-
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -14,54 +12,58 @@ struct Cli {
 use rusoto_credential::{ProvideAwsCredentials, DefaultCredentialsProvider};
 use futures::future::Future;
 
-use hyper::{Body, Request};
+use hyper::{Body, Chunk, Request, Response, Server};
 
-use simple_proxy::proxy::error::MiddlewareError;
-use simple_proxy::proxy::middleware::MiddlewareResult::Next;
-use simple_proxy::proxy::middleware::{Middleware, MiddlewareResult};
-use simple_proxy::proxy::service::{ServiceContext, State};
+use http::uri::Uri;
 
-pub struct AwsSignatureHeaders { }
+use monie::{Mitm, MitmProxyService};
 
-impl AwsSignatureHeaders {
-    pub fn new() -> Self {
-        AwsSignatureHeaders{ }
-    }
+#[derive(Debug)]
+struct AddsAWSSignatureHeaders;
+
+fn add_signature_headers(req: Request<Body>) -> Request<Body> {
+    let mut request = Request::from(req);
+    let aws_utc_datestrings = aws_signature_builder::AwsUTCDateStrings::new();
+    let provider = DefaultCredentialsProvider::new().unwrap();
+    let credentials = provider.credentials().wait().unwrap();
+    let new_headers = aws_signature_builder::generate_aws_signature_headers(
+        aws_utc_datestrings,
+        credentials,
+        &mut request);
+    aws_signature_builder::add_aws_signature_headers(&mut request, new_headers);
+    request
 }
 
-impl Middleware for AwsSignatureHeaders {
-    fn name() -> String {
-        String::from("AwsSignatureHeaders")
+impl Mitm for AddsAWSSignatureHeaders {
+    fn new(uri: Uri) -> AddsAWSSignatureHeaders {
+        println!("proxying request for {}", uri);
+        AddsAWSSignatureHeaders { }
     }
 
-    fn before_request(
-        &mut self,
-        req: &mut Request<Body>,
-        _context: &ServiceContext,
-        _state: &State,
-    ) -> Result<MiddlewareResult, MiddlewareError> {
-        let aws_utc_datestrings = aws_signature_builder::AwsUTCDateStrings::new();
-        let provider = DefaultCredentialsProvider::new().unwrap();
-        let credentials = provider.credentials().wait().unwrap();
-        let new_headers = aws_signature_builder::generate_aws_signature_headers(
-            aws_utc_datestrings,
-            credentials,
-            req);
-        aws_signature_builder::add_aws_signature_headers(req, new_headers);
-        Ok(Next)
+    fn request_headers(&self, req: Request<Body>) -> Request<Body> {
+        add_signature_headers(req)
+    }
+
+    fn response_headers(&self, res: Response<Body>) -> Response<Body> {
+        res
+    }
+
+    fn request_body_chunk(&self, chunk: Chunk) -> Chunk {
+        chunk
+    }
+
+    fn response_body_chunk(&self, chunk: Chunk) -> Chunk {
+        chunk
     }
 }
 
 fn main() {
     let args = Cli::from_args();
-
-    // Simple proxy setup
-    let mut proxy = SimpleProxy::new(args.port, Environment::Development);
-
-    // Adding signature middleware
-    let add_aws_signature_headers = AwsSignatureHeaders::new();
-    proxy.add_middleware(Box::new(add_aws_signature_headers));
-
-    // Start proxy
-    proxy.run();
+    let addr = ([127, 0, 0, 1], args.port).into();
+    let svc = MitmProxyService::<AddsAWSSignatureHeaders>::new();
+    let server = Server::bind(&addr)
+        .serve(svc)
+        .map_err(|e| eprintln!("server error: {}", e));
+    println!("add-via mitm proxy listening on http://{}", addr);
+    hyper::rt::run(server);
 }
