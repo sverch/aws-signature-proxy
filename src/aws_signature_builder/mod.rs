@@ -9,6 +9,7 @@ use chrono;
 
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use rusoto_credential::AwsCredentials;
+use hyper::{Body, Request};
 
 use std::collections::HashMap;
 
@@ -22,6 +23,30 @@ fn normalize_query_string(query: String) -> String {
     let mut query_pairs = querystring::querify(&query);
     query_pairs.sort_by(|a, b| a.0.cmp(&b.0));
     return String::from(querystring::stringify(query_pairs).trim_end_matches("&"));
+}
+
+/// Get the "service name" identifier from the host.  There may be a better way to do this, but
+/// this works for now.  Currently this would not fail gracefully if the host string was empty.
+///
+/// See https://docs.aws.amazon.com/general/latest/gr/rande.html
+fn extract_service_name(host: &String) -> String {
+    let host_parts: Vec<&str> = host.split(".").collect();
+    host_parts[0].to_string()
+}
+
+/// Returns the region from the given host based on the AWS service endpoint mapping.
+///
+/// TODO: Actually support all the service endpoints, and make sure this works.  Also catch error
+/// cases with malformed hosts.
+///
+/// See https://docs.aws.amazon.com/general/latest/gr/rande.html
+fn infer_region_from_service_endpoint(host: &String) -> String {
+    let host_parts: Vec<&str> = host.split(".").collect();
+    if host_parts[1] == "amazonaws" {
+        String::from("us-east-1")
+    } else {
+        host_parts[1].to_string()
+    }
 }
 
 /// These are the datestrings that are expected in the AWS request.  We generate this all at once
@@ -42,37 +67,77 @@ impl AwsUTCDateStrings {
     }
 }
 
+/// Returns a HashMap with the proper signature headers for the given request
+///
+/// # Arguments
+///
+/// * `aws_utc_datestrings` - Some current time strings that AWS expects in the signing process
+/// * `credentials` - The AWS credentials that should be used to sign the request
+/// * `req` - The request that is being signed
+///
+/// # Example
+///
+/// ```
+/// // You can have rust code between fences inside the comments
+/// // If you pass --test to Rustdoc, it will even test it for you!
+/// use doc::Person;
+/// let person = Person::new("name");
+/// ```
 pub fn generate_aws_signature_headers(
     aws_utc_datestrings: AwsUTCDateStrings,
     credentials: AwsCredentials,
-    query: String,
-    headers: HashMap<String, String>,
-    port: Option<u16>,
-    host: String,
-    method: String,
-    data: Vec<u8>,
-    data_binary: bool,
-    service: String,
-    region: String,
-    canonical_uri: String) -> HashMap<String, String> {
+    req: &mut Request<Body>) -> HashMap<String, String> {
+
+    // TODO: Support data in the request
+    let data: Vec<u8> = Vec::new();
+    let data_binary: bool = false;
+
+    let port = match req.uri().port_part() {
+        Some(x) => Some(x.as_u16()),
+        None => None,
+    };
+    let host = req.uri().host().unwrap().to_string();
+    let service = extract_service_name(&host);
+    let region = infer_region_from_service_endpoint(&host);
+
+    let mut headers = ::std::collections::HashMap::new();
+    for (key, value) in req.headers().iter() {
+        headers.insert(String::from(key.as_str()), String::from(value.to_str().unwrap()));
+    }
+    let canonical_uri = req.uri().path().to_string();
     let (canonical_request,
          payload_hash,
          signed_headers) = task_1_create_a_canonical_request(
         aws_utc_datestrings.clone(),
-        query, headers, port, host, method, data,
+        req.uri().query().unwrap().to_string(),
+        headers,
+        port,
+        host,
+        req.method().to_string(),
+        data,
         credentials.token(),
-        data_binary, canonical_uri);
+        data_binary,
+        canonical_uri);
     let (string_to_sign,
          algorithm,
          credential_scope) = task_2_create_the_string_to_sign(
         aws_utc_datestrings.clone(),
-        canonical_request, service.clone(), region.clone());
+        canonical_request,
+        service.clone(),
+        region.clone());
     let signature = task_3_calculate_the_signature(
         aws_utc_datestrings.clone(),
-        string_to_sign, service, region, credentials.aws_secret_access_key().to_string());
+        string_to_sign,
+        service,
+        region,
+        credentials.aws_secret_access_key().to_string());
     let new_headers = task_4_build_auth_headers_for_the_request(
         aws_utc_datestrings.clone(),
-        payload_hash, algorithm, credential_scope, signed_headers, signature,
+        payload_hash,
+        algorithm,
+        credential_scope,
+        signed_headers,
+        signature,
         credentials.aws_access_key_id().to_string(),
         credentials.token());
     return new_headers;
@@ -378,13 +443,14 @@ mod tests {
 
     #[test]
     fn test_generate_aws_signature_headers() {
-        let mut headers = ::std::collections::HashMap::new();
-        headers.insert(
-            String::from("Content-Type"),
-            String::from("application/json"));
-        headers.insert(
-            String::from("Accept"),
-            String::from("application/xml"));
+        let mut request_builder = super::Request::builder();
+        request_builder.header(hyper::header::CONTENT_TYPE,
+             String::from("application/json"));
+        request_builder.header(hyper::header::ACCEPT,
+             String::from("application/xml"));
+        request_builder.uri("https://ec2.amazonaws.com/?Action=DescribeInstances&Version=2013-10-15");
+        request_builder.method("GET");
+        let mut request = request_builder.body(super::Body::empty()).unwrap();
         let new_headers = super::generate_aws_signature_headers(
             super::AwsUTCDateStrings{
                 amzdate: String::from("20190921T022008Z"),
@@ -396,16 +462,7 @@ mod tests {
                 None,
                 None
             ),
-            String::from("Action=DescribeInstances&Version=2013-10-15"),
-            headers,
-            None,
-            String::from("ec2.amazonaws.com"),
-            String::from("GET"),
-            Vec::new(),
-            false,
-            String::from("ec2"),
-            String::from("us-east-1"),
-            String::from("/"));
+            &mut request);
         assert_eq!(
             new_headers["x-amz-content-sha256"],
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
