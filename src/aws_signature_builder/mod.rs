@@ -118,6 +118,9 @@ pub fn generate_aws_signature_headers(
     let service = extract_service_name(&host);
     let region = infer_region_from_service_endpoint(&host);
 
+    // Convert headers to a hashmap because this internal code was written to work with a HashMap
+    // TODO: Make everything work with the original headers, because it's actually a "multi map"
+    // and not quite the same as a hash map.
     let mut headers = ::std::collections::HashMap::new();
     for (key, value) in req.headers().iter() {
         headers.insert(String::from(key.as_str()), String::from(value.to_str().unwrap()));
