@@ -192,6 +192,10 @@ pub fn add_aws_signature_headers(
 ///
 /// Step 2: Create canonical URI--the part of the URI from domain to query string (use '/' if no
 /// path)
+///
+/// Note, this code was indirectly copied from:
+/// https://docs.aws.amazon.com/general/latest/gr/sigv4-signed-request-examples.html, so some of
+/// this logic may not have an immediately obvious reason behind it.
 fn task_1_create_a_canonical_request(
     aws_utc_datestrings: AwsUTCDateStrings,
     query: String,
@@ -266,6 +270,10 @@ fn task_1_create_a_canonical_request(
 
 /// ************* TASK 2: CREATE THE STRING TO SIGN*************
 /// Match the algorithm to the hashing algorithm you use, either SHA-1 or SHA-256 (recommended)
+///
+/// Note, this code was indirectly copied from:
+/// https://docs.aws.amazon.com/general/latest/gr/sigv4-signed-request-examples.html, so some of
+/// this logic may not have an immediately obvious reason behind it.
 fn task_2_create_the_string_to_sign(
     aws_utc_datestrings: AwsUTCDateStrings,
     canonical_request: String,
@@ -284,6 +292,10 @@ fn task_2_create_the_string_to_sign(
 }
 
 /// ************* TASK 3: CALCULATE THE SIGNATURE *************
+///
+/// Note, this code was indirectly copied from:
+/// https://docs.aws.amazon.com/general/latest/gr/sigv4-signed-request-examples.html, so some of
+/// this logic may not have an immediately obvious reason behind it.
 fn task_3_calculate_the_signature(
     aws_utc_datestrings: AwsUTCDateStrings,
     string_to_sign: String,
@@ -317,6 +329,10 @@ fn task_3_calculate_the_signature(
 /// The signing information can be either in a query string value or in a header named
 /// Authorization. This function shows how to use the header.  It returns a headers dict with all
 /// the necessary signing headers.
+///
+/// Note, this code was indirectly copied from:
+/// https://docs.aws.amazon.com/general/latest/gr/sigv4-signed-request-examples.html, so some of
+/// this logic may not have an immediately obvious reason behind it.
 fn task_4_build_auth_headers_for_the_request(
     aws_utc_datestrings: AwsUTCDateStrings,
     payload_hash: String,
