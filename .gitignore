@@ -1,3 +1,7 @@
 /target
 **/*.rs.bk
 rusty-tags.vi
+certs
+# Gencerts creates these because it runs a golang application
+go.mod
+go.sum
