@@ -34,6 +34,49 @@ https_proxy=localhost:8080 curl --insecure --silent \
     "https://ec2.amazonaws.com?Action=DescribeInstances&Version=2013-10-15"
 ```
 
+## Self Signed Certificates
+
+By default, the proxy generates a standalone self signed certificate for each
+endpoint on demand, which means you will have to ignore certificate validation
+errors to use it.
+
+To use your own certificates that you have presumably trusted, you can set
+`MONIE_CERT_FILE` and `MONIE_KEY_FILE` to custom certificates.
+
+The `gencerts.sh` helper script uses the wonderful
+[mkcert](https://github.com/FiloSottile/mkcert) tool to help you easily generate
+some self signed certificates that can pose as the AWS endpoints.  The mkcert
+tool also automatically tells your system to trust the CA, so after you run this
+the certs should "just work":
+
+```
+$ ./gencerts.sh ./certs us-east-1 us-west-2
++ mkdir certs
+Generating certificates for endpoints in "us-east-1 us-west-2"
++ go run github.com/FiloSottile/mkcert -install -cert-file certs/cert.pem -key-file certs/private.pem *.amazonaws.com *.us-east-1.amazonaws.com *.us-west-2.amazonaws.com
+Using the local CA at "/home/sverch/.local/share/mkcert" ✨
+
+Created a new certificate valid for the following names 📜
+ - "*.amazonaws.com"
+ - "*.us-east-1.amazonaws.com"
+ - "*.us-west-2.amazonaws.com"
+
+Reminder: X.509 wildcards only go one level deep, so this won't match a.b.amazonaws.com ℹ️
+
+The certificate is at "certs/cert.pem" and the key at "certs/private.pem" ✅
+
+Converting private key to RSA private key
++ openssl rsa -in certs/private.pem -out certs/private.key
+writing RSA key
+Certificates generated!  Set the following environment variables:
+export MONIE_CERT_FILE=certs/cert.pem
+export MONIE_KEY_FILE=certs/private.key
+```
+
+After setting `MONIE_CERT_FILE` and `MONIE_KEY_FILE` to what the script tells
+you to set them to, you should be able to run `curl` without the `--insecure`
+option.  You should also be able to run other clients without any errors.
+
 ## The AWS Signing Process
 
 If you want to understand the signing process, there are many AWS docs on this.
@@ -45,8 +88,6 @@ docs](https://docs.aws.amazon.com/general/latest/gr/sigv4-signed-request-example
 ## Caveats
 
 - Only `GET` requests are supported.
-- No attempt has been made to address the invalid certificate errors a client
-  will experience when working with this proxy.
 
 ## Thanks
 
