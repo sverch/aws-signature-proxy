@@ -18,6 +18,7 @@ const XAMZSECURITYTOKEN: &str = "x-amz-security-token";
 const XAMZDATE: &str = "x-amz-date";
 
 use std::collections::HashMap;
+use std::str;
 
 /// https://url.spec.whatwg.org/#fragment-percent-encode-set
 const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
@@ -25,10 +26,21 @@ const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').ad
 /// https://url.spec.whatwg.org/#path-percent-encode-set
 const PATH: &AsciiSet = &FRAGMENT.add(b'#').add(b'?').add(b'{').add(b'}');
 
+/// https://url.spec.whatwg.org/#userinfo-percent-encode-set
+const USERINFO: &AsciiSet = &FRAGMENT.add(b'/').add(b':').add(b';').add(b'=').add(b'@').add(b'[').add(b'\\').add(b']').add(b'^').add(b'|');
+
 fn normalize_query_string(query: String) -> String {
     let mut query_pairs = querystring::querify(&query);
     query_pairs.sort_by(|a, b| a.0.cmp(&b.0));
-    return String::from(querystring::stringify(query_pairs).trim_end_matches("&"));
+    let mut escaped_query_pairs = Vec::new();
+    for (k, v) in query_pairs {
+        escaped_query_pairs.push(
+            (utf8_percent_encode(k, USERINFO).to_string(),
+             utf8_percent_encode(v, USERINFO).to_string()));
+    };
+    let escaped_query_pairs = escaped_query_pairs.iter().map(|(s1, s2)|
+        (s1.as_str(), s2.as_str())).collect::<Vec<_>>();
+    return String::from(querystring::stringify(escaped_query_pairs).trim_end_matches("&"));
 }
 
 /// Get the "service name" identifier from the host.  There may be a better way to do this, but
@@ -390,6 +402,10 @@ mod tests {
             String::from("Version=2013-10-15&Action=DescribeInstances"));
         assert_eq!(canonical_querystring_2,
             String::from("Action=DescribeInstances&Version=2013-10-15"));
+        let canonical_querystring_3 = super::normalize_query_string(
+            String::from("Resource=arn:aws:cloudfront::ID:distribution/ID"));
+        assert_eq!(canonical_querystring_3,
+            String::from("Resource=arn%3Aaws%3Acloudfront%3A%3AID%3Adistribution%2FID"));
     }
 
     #[test]
