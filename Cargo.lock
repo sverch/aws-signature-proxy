@@ -58,7 +58,7 @@ dependencies = [
  "hmac-sha256 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "http 0.1.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.12.35 (git+https://github.com/sverch/hyper?branch=0.12.35-pubpool)",
- "monie 0.1.0 (git+https://github.com/sverch/monie?branch=temp-cert-path)",
+ "monie 0.1.0 (git+https://github.com/sverch/monie?branch=env-var-custom-cert)",
  "openssl 0.10.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "percent-encoding 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "querystring 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -570,7 +570,7 @@ dependencies = [
 [[package]]
 name = "monie"
 version = "0.1.0"
-source = "git+https://github.com/sverch/monie?branch=temp-cert-path#9d4e576bb50fcb38c97c2cd14e21cf83a1b99dc5"
+source = "git+https://github.com/sverch/monie?branch=env-var-custom-cert#d772f58391aecfe63f728bad4d53cfa552f95118"
 dependencies = [
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1522,7 +1522,7 @@ dependencies = [
 "checksum mio-uds 0.6.7 (registry+https://github.com/rust-lang/crates.io-index)" = "966257a94e196b11bb43aca423754d87429960a768de9414f3691d6957abf125"
 "checksum miow 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8c1f2f3b1cf331de6896aabf6e9d55dca90356cc9960cca7eaaf408a355ae919"
 "checksum miow 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "396aa0f2003d7df8395cb93e09871561ccc3e785f0acb369170e8cc74ddf9226"
-"checksum monie 0.1.0 (git+https://github.com/sverch/monie?branch=temp-cert-path)" = "<none>"
+"checksum monie 0.1.0 (git+https://github.com/sverch/monie?branch=env-var-custom-cert)" = "<none>"
 "checksum net2 0.2.33 (registry+https://github.com/rust-lang/crates.io-index)" = "42550d9fb7b6684a6d404d9fa7250c2eb2646df731d1c06afc06dcee9e1bcf88"
 "checksum nodrop 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)" = "72ef4a56884ca558e5ddb05a1d1e7e1bfd9a68d9ed024c21704cc98872dae1bb"
 "checksum num-integer 0.1.41 (registry+https://github.com/rust-lang/crates.io-index)" = "b85e541ef8255f6cf42bbfe4ef361305c6c135d10919ecc26126c4e5ae94bc09"
